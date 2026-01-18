@@ -1,0 +1,14 @@
+# IntelliJ
+.idea/
+*.iml
+
+# Maven / Gradle
+target/
+build/
+.gradle/
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log

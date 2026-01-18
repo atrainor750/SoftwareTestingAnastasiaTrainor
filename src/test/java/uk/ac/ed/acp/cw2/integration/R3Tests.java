@@ -1,0 +1,131 @@
+package uk.ac.ed.acp.cw2.integration;
+
+
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+import org.springframework.web.client.RestTemplate;
+import uk.ac.ed.acp.cw2.Helpers.NoFlyZoneHelper;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class R3R4Tests {
+
+    private static final String DEFAULT_ILP =
+            "https://ilp-rest-2025-bvh6e9hschfagrgy.ukwest-01.azurewebsites.net";
+
+    //  R3: Controlled extraction of no-fly zones from ILP endpoint.
+     // This test calls the live ILP service and asserts the /restricted-areas JSON is exactly as expected.
+
+    @Test
+    void restrictedAreasEndpoint_returnsExpectedJsonExactly() throws Exception {
+        // Build URL (your NoFlyZoneHelper.refreshZones uses "/restricted-areas")
+        String url = DEFAULT_ILP + "/restricted-areas";
+
+        RestTemplate restTemplate = new RestTemplate();
+        String actualJson = restTemplate.getForObject(url, String.class);
+
+        assertNotNull(actualJson, "ILP returned null body");
+
+        String expectedJson = """
+            [
+              {
+                "name":"George Square Area",
+                "id":1,
+                "limits":{"lower":0,"upper":-1},
+                "vertices":[
+                  {"lng":-3.190578818321228,"lat":55.94402412577528,"alt":null},
+                  {"lng":-3.1899887323379517,"lat":55.94284650540911,"alt":null},
+                  {"lng":-3.187097311019897,"lat":55.94328811724263,"alt":null},
+                  {"lng":-3.187682032585144,"lat":55.944477740393744,"alt":null},
+                  {"lng":-3.190578818321228,"lat":55.94402412577528,"alt":null}
+                ]
+              },
+              {
+                "name":"Dr Elsie Inglis Quadrangle",
+                "id":2,
+                "limits":{"lower":0,"upper":-1},
+                "vertices":[
+                  {"lng":-3.1907182931900024,"lat":55.94519570234043,"alt":null},
+                  {"lng":-3.1906163692474365,"lat":55.94498241796357,"alt":null},
+                  {"lng":-3.1900262832641597,"lat":55.94507554227258,"alt":null},
+                  {"lng":-3.190133571624756,"lat":55.94529783810495,"alt":null},
+                  {"lng":-3.1907182931900024,"lat":55.94519570234043,"alt":null}
+                ]
+              },
+              {
+                "name":"Bristo Square Open Area",
+                "id":3,
+                "limits":{"lower":0,"upper":-1},
+                "vertices":[
+                  {"lng":-3.189543485641479,"lat":55.94552313663306,"alt":null},
+                  {"lng":-3.189382553100586,"lat":55.94553214854692,"alt":null},
+                  {"lng":-3.189259171485901,"lat":55.94544803726933,"alt":null},
+                  {"lng":-3.1892001628875732,"lat":55.94533688994374,"alt":null},
+                  {"lng":-3.189194798469543,"lat":55.94519570234043,"alt":null},
+                  {"lng":-3.189135789871216,"lat":55.94511759833873,"alt":null},
+                  {"lng":-3.188138008117676,"lat":55.9452738061846,"alt":null},
+                  {"lng":-3.1885510683059692,"lat":55.946105902745614,"alt":null},
+                  {"lng":-3.1895381212234497,"lat":55.94555918427592,"alt":null},
+                  {"lng":-3.189543485641479,"lat":55.94552313663306,"alt":null}
+                ]
+              },
+              {
+                "name":"Bayes Central Area",
+                "id":4,
+                "limits":{"lower":0,"upper":-1},
+                "vertices":[
+                  {"lng":-3.1876927614212036,"lat":55.94520696732767,"alt":null},
+                  {"lng":-3.187555968761444,"lat":55.9449621408666,"alt":null},
+                  {"lng":-3.186981976032257,"lat":55.94505676722831,"alt":null},
+                  {"lng":-3.1872327625751495,"lat":55.94536993377657,"alt":null},
+                  {"lng":-3.1874459981918335,"lat":55.9453361389472,"alt":null},
+                  {"lng":-3.1873735785484314,"lat":55.94519344934259,"alt":null},
+                  {"lng":-3.1875935196876526,"lat":55.94515665035927,"alt":null},
+                  {"lng":-3.187624365091324,"lat":55.94521973430925,"alt":null},
+                  {"lng":-3.1876927614212036,"lat":55.94520696732767,"alt":null}
+                ]
+              }
+            ]
+            """;
+
+
+        ObjectMapper om = new ObjectMapper();
+        JsonNode expectedTree = om.readTree(expectedJson);
+        JsonNode actualTree = om.readTree(actualJson);
+
+        assertEquals(expectedTree, actualTree,
+                () -> "ILP /restricted-areas response did not match expected JSON.\n"
+                        + "Actual:\n" + actualJson);
+    }
+    @Test
+    void ilpRestrictedAreas_isReachable_andReturnsNonEmptyJson() {
+        String base = System.getenv().getOrDefault(
+                "ILP_ENDPOINT",
+                "https://ilp-rest-2025-bvh6e9hschfagrgy.ukwest-01.azurewebsites.net/"
+        );
+
+
+        String trimmed = base.endsWith("/") ? base.substring(0, base.length() - 1) : base;
+        String url = trimmed + "/restricted-areas";
+
+        RestTemplate rt = new RestTemplate();
+        String body = rt.getForObject(url, String.class);
+
+        assertNotNull(body);
+        assertTrue(body.contains("George Square Area") || body.contains("\"name\""),
+                "Expected ILP to return restricted areas JSON");
+    }
+    @Test
+    void refreshZones_whenIlpUnreachable_failsGracefullyWithEmptyZones() {
+        // Port 1 is almost always closed; causes RestClientException quickly
+        NoFlyZoneHelper helper = new NoFlyZoneHelper("http://localhost:1");
+
+        helper.refreshZones();
+
+        assertNotNull(helper.zones);
+        assertTrue(helper.zones.isEmpty(), "On dependency failure, zones should become empty");
+    }
+
+}
